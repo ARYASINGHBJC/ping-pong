@@ -8,6 +8,7 @@ const PADDLE_HEIGHT = 12;
 const BALL_SIZE = 12;
 const PADDLE_SPEED = 6;
 const BALL_SPEED = 4;
+const SCORE_LIMIT = 20; // Add this at the top with your other constants
 
 function clamp(val, min, max) {
   return Math.max(min, Math.min(val, max));
@@ -32,6 +33,7 @@ const initialState = () => ({
 
 export default function PongBoard({ player }) {
   const [state, setState] = useState(initialState());
+  const [winner, setWinner] = useState(null); // Track the winner
   const keys = useRef({ left: false, right: false });
   const gameRef = useRef();
 
@@ -57,6 +59,7 @@ export default function PongBoard({ player }) {
   }, [leftKey, rightKey]);
 
   useEffect(() => {
+    if (winner) return; // Stop game loop if there's a winner
     let animationId;
     function gameLoop() {
       setState((prev) => {
@@ -104,11 +107,19 @@ export default function PongBoard({ player }) {
         // Score (top missed)
         if (y < 0) {
           scores.bottom += 1;
+          if (scores.bottom >= SCORE_LIMIT) {
+            setWinner("Bottom Player Wins!");
+            return { ...initialState(), scores };
+          }
           return { ...initialState(), scores };
         }
         // Score (bottom missed)
         if (y + BALL_SIZE > BOARD_HEIGHT) {
           scores.top += 1;
+          if (scores.top >= SCORE_LIMIT) {
+            setWinner("Top Player Wins!");
+            return { ...initialState(), scores };
+          }
           return { ...initialState(), scores };
         }
 
@@ -122,7 +133,7 @@ export default function PongBoard({ player }) {
     }
     animationId = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animationId);
-  }, []);
+  }, [winner]); // Add winner as a dependency
 
   // Render
   return (
@@ -158,6 +169,26 @@ export default function PongBoard({ player }) {
       />
       {/* Player label */}
       <div className="player-label">{player}</div>
+      {/* Winner message */}
+      {winner && (
+        <div
+          style={{
+            position: "absolute",
+            top: "40%",
+            left: 0,
+            right: 0,
+            textAlign: "center",
+            color: "#fff",
+            fontSize: "2rem",
+            background: "#000a",
+            padding: "20px",
+            borderRadius: "10px",
+            zIndex: 100,
+          }}
+        >
+          {winner}
+        </div>
+      )}
     </div>
   );
 }

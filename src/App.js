@@ -9,6 +9,7 @@ const PADDLE_HEIGHT = 12;
 const BALL_SIZE = 12;
 const PADDLE_SPEED = 6;
 const BALL_SPEED = 4;
+const SCORE_LIMIT = 10; 
 
 function clamp(val, min, max) {
   return Math.max(min, Math.min(val, max));
@@ -33,11 +34,13 @@ const initialState = () => ({
 
 export default function App() {
   const [state, setState] = useState(initialState());
+  const [winner, setWinner] = useState(null);
   const keys = useRef({ bottomLeft: false, bottomRight: false, topLeft: false, topRight: false });
 
   // Reset handler
   const handleReset = () => {
     setState(initialState());
+    setWinner(null);
   };
 
   useEffect(() => {
@@ -62,14 +65,16 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (winner) return; // Stop game loop if there's a winner
     let animationId;
+
     function gameLoop() {
       setState((prev) => {
-        let {
-          ball: { x, y, vx, vy },
-          paddles,
-          scores,
-        } = JSON.parse(JSON.stringify(prev));
+        let { ball, paddles, scores } = prev;
+        ball = { ...ball };
+        paddles = { ...paddles };
+        scores = { ...scores };
+        let { x, y, vx, vy } = ball;
 
         // Paddle movement
         if (keys.current.bottomLeft)
@@ -85,39 +90,54 @@ export default function App() {
         x += vx;
         y += vy;
 
-        // Wall collision (left/right)
-        if (x < 0 || x > BOARD_WIDTH - BALL_SIZE) vx = -vx;
+        // Wall collision (left/right) with clamping
+        if (x < 0) { x = 0; vx = -vx; }
+        if (x > BOARD_WIDTH - BALL_SIZE) { x = BOARD_WIDTH - BALL_SIZE; vx = -vx; }
 
         // Paddle collision (top)
         if (
-          y < PADDLE_HEIGHT + 8 &&
+          y <= PADDLE_HEIGHT + 8 &&
           x + BALL_SIZE > paddles.top &&
           x < paddles.top + PADDLE_WIDTH &&
           vy < 0
         ) {
-          vy = -vy;
-          y = PADDLE_HEIGHT + 10;
+          const hitPos = ((x + BALL_SIZE / 2) - (paddles.top + PADDLE_WIDTH / 2)) / (PADDLE_WIDTH / 2);
+          vx += hitPos * 2;
+          vx = clamp(vx, -BALL_SPEED * 1.5, BALL_SPEED * 1.5);
+          vy = -vy * 1.05;
+          y = PADDLE_HEIGHT + 8;
         }
 
         // Paddle collision (bottom)
         if (
-          y + BALL_SIZE > BOARD_HEIGHT - PADDLE_HEIGHT - 8 &&
+          y + BALL_SIZE >= BOARD_HEIGHT - PADDLE_HEIGHT - 8 &&
           x + BALL_SIZE > paddles.bottom &&
           x < paddles.bottom + PADDLE_WIDTH &&
           vy > 0
         ) {
-          vy = -vy;
-          y = BOARD_HEIGHT - PADDLE_HEIGHT - BALL_SIZE - 10;
+          const hitPos = ((x + BALL_SIZE / 2) - (paddles.bottom + PADDLE_WIDTH / 2)) / (PADDLE_WIDTH / 2);
+          vx += hitPos * 2;
+          vx = clamp(vx, -BALL_SPEED * 1.5, BALL_SPEED * 1.5);
+          vy = -vy * 1.05;
+          y = BOARD_HEIGHT - PADDLE_HEIGHT - 8 - BALL_SIZE;
         }
 
         // Score (top missed)
         if (y < 0) {
           scores.bottom += 1;
+          if (scores.bottom >= SCORE_LIMIT) {
+            setWinner("Bottom Player Wins!");
+            return { ...initialState(), scores };
+          }
           return { ...initialState(), scores };
         }
         // Score (bottom missed)
         if (y + BALL_SIZE > BOARD_HEIGHT) {
           scores.top += 1;
+          if (scores.top >= SCORE_LIMIT) {
+            setWinner("Top Player Wins!");
+            return { ...initialState(), scores };
+          }
           return { ...initialState(), scores };
         }
 
@@ -131,7 +151,7 @@ export default function App() {
     }
     animationId = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animationId);
-  }, []);
+  }, [winner]); //  Add winner as dependency
 
   return (
     <div className="app-center">
@@ -171,6 +191,26 @@ export default function App() {
         <div className="player-label" style={{ bottom: 50, top: "unset" }}>
           Bottom: A D
         </div>
+        {/* Winner message */}
+        {winner && (
+          <div
+            style={{
+              position: "absolute",
+              top: "40%",
+              left: 0,
+              right: 0,
+              textAlign: "center",
+              color: "#fff",
+              fontSize: "2rem",
+              background: "#000a",
+              padding: "20px",
+              borderRadius: "10px",
+              zIndex: 100,
+            }}
+          >
+            {winner}
+          </div>
+        )}
       </div>
       <button className="reset-btn" onClick={handleReset}>
         Reset
