@@ -20,12 +20,16 @@
   z-index: 10;
 }
 .left-score {
-  left: 28px;
-  top: 45%;
+  position: absolute;
+  top: 16px;      
+  left: 24px;     
+  font-size: 2rem;
 }
 .right-score {
-  right: 28px;
-  top: 55%;
+  position: absolute;
+  bottom: 16px;   /* Move closer to the bottom */
+  right: 28px;    /* Adjust as needed */
+  font-size: 2rem;
 }
 .center-line {
   position: absolute;
