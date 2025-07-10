@@ -5,11 +5,14 @@ import "./PongBoard.css";
 const BOARD_WIDTH = 400;
 const BOARD_HEIGHT = 600;
 const PADDLE_WIDTH = 80;
-const PADDLE_HEIGHT = 12;
+const PADDLE_HEIGHT = 6;
 const BALL_SIZE = 12;
 const PADDLE_SPEED = 6;
 const BALL_SPEED = 4;
 const SCORE_LIMIT = 10; 
+
+const TOP_PADDLE_Y = 24; // Match the CSS .top-paddle { top: 24px; }
+const BOTTOM_PADDLE_Y = BOARD_HEIGHT - PADDLE_HEIGHT - 24; // 24px from bottom per CSS
 
 function clamp(val, min, max) {
   return Math.max(min, Math.min(val, max));
@@ -21,6 +24,8 @@ const initialState = () => ({
     y: BOARD_HEIGHT / 2 - BALL_SIZE / 2,
     vx: BALL_SPEED * (Math.random() > 0.5 ? 1 : -1),
     vy: BALL_SPEED * (Math.random() > 0.5 ? 1 : -1),
+    prevX: BOARD_WIDTH / 2 - BALL_SIZE / 2,
+    prevY: BOARD_HEIGHT / 2 - BALL_SIZE / 2,
   },
   paddles: {
     top: BOARD_WIDTH / 2 - PADDLE_WIDTH / 2,
@@ -74,7 +79,10 @@ export default function App() {
         ball = { ...ball };
         paddles = { ...paddles };
         scores = { ...scores };
-        let { x, y, vx, vy } = ball;
+        let { x, y, vx, vy, prevX, prevY } = ball;
+        // Store previous position
+        prevX = x;
+        prevY = y;
 
         // Paddle movement
         if (keys.current.bottomLeft)
@@ -94,23 +102,27 @@ export default function App() {
         if (x < 0) { x = 0; vx = -vx; }
         if (x > BOARD_WIDTH - BALL_SIZE) { x = BOARD_WIDTH - BALL_SIZE; vx = -vx; }
 
-        // Paddle collision (top)
-        if (
-          y <= PADDLE_HEIGHT + 8 &&
+        // Robust Paddle collision (top)
+        // Check if the ball crossed the paddle between frames
+        const crossedTopPaddle =
+          prevY >= TOP_PADDLE_Y + PADDLE_HEIGHT && // Was below the paddle
+          y <= TOP_PADDLE_Y + PADDLE_HEIGHT &&     // Now at or above the paddle's bottom
+          vy < 0 &&
           x + BALL_SIZE > paddles.top &&
-          x < paddles.top + PADDLE_WIDTH &&
-          vy < 0
-        ) {
+          x < paddles.top + PADDLE_WIDTH;
+
+        if (crossedTopPaddle) {
           const hitPos = ((x + BALL_SIZE / 2) - (paddles.top + PADDLE_WIDTH / 2)) / (PADDLE_WIDTH / 2);
           vx += hitPos * 2;
           vx = clamp(vx, -BALL_SPEED * 1.5, BALL_SPEED * 1.5);
           vy = -vy * 1.05;
-          y = PADDLE_HEIGHT + 8;
+          y = TOP_PADDLE_Y + PADDLE_HEIGHT + 0.1;
         }
 
         // Paddle collision (bottom)
         if (
-          y + BALL_SIZE >= BOARD_HEIGHT - PADDLE_HEIGHT - 8 &&
+          y + BALL_SIZE >= BOTTOM_PADDLE_Y &&
+          y <= BOTTOM_PADDLE_Y + PADDLE_HEIGHT &&
           x + BALL_SIZE > paddles.bottom &&
           x < paddles.bottom + PADDLE_WIDTH &&
           vy > 0
@@ -119,7 +131,7 @@ export default function App() {
           vx += hitPos * 2;
           vx = clamp(vx, -BALL_SPEED * 1.5, BALL_SPEED * 1.5);
           vy = -vy * 1.05;
-          y = BOARD_HEIGHT - PADDLE_HEIGHT - 8 - BALL_SIZE;
+          y = BOTTOM_PADDLE_Y - BALL_SIZE; // Place ball just above the bottom paddle
         }
 
         // Score (top missed)
@@ -142,7 +154,7 @@ export default function App() {
         }
 
         return {
-          ball: { x, y, vx, vy },
+          ball: { x, y, vx, vy, prevX, prevY },
           paddles,
           scores,
         };
